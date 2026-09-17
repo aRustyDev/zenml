@@ -47,6 +47,7 @@ Some dossiers use "Tier B" loosely for *any* config-gated area (0008, 0009, 0011
 | 10 | [Projects](findings/0010-projects.md) | **Open** | Enforcement + metering. Any user can delete any project | n/a — but note the dashboard, not the server, limits multi-project |
 | 11 | [Artifact Management](findings/0011-artifact-management.md) | **Complete** | Nothing — unmetered on *both* editions | Five config knobs only |
 | 12 | [Model Management](findings/0012-model-management.md) | **Open** | Enforcement + metering | n/a |
+| 13 | [Stacks & Components](findings/0013-stacks-and-components.md) | **Open** | Enforcement — and here there is *no* `is_admin` fallback either | n/a |
 
 ## The five things worth acting on
 
@@ -80,6 +81,53 @@ Some dossiers use "Tier B" loosely for *any* config-gated area (0008, 0009, 0011
    assigned by anything — not the Pro override block, not Helm — so even a Pro server sets it by
    env var. `initialize_resource_pool_store()` is also called twice (`zen_server_api.py:182`, `:187`).
 
+## One security consequence worth acting on
+
+Stacks are the **worst-governed** surface in OSS. With RBAC off, every `verify_permission` call is a
+no-op — and unlike users, secrets and service accounts, **no stack endpoint calls
+`verify_admin_status_if_no_rbac`**, so there is not even the coarse `is_admin` fallback.
+
+Concretely: `PATCH /flavors/sync` (`flavors_endpoints.py:190-191`) purges and rewrites the entire
+server-wide flavor table, guarded only by `verify_permission(FLAVOR, UPDATE)`. On an OSS server that
+is **callable by any authenticated principal, service accounts included**. Scope your API keys
+accordingly, or front the server with a proxy that denies this route.
+
+Related: `stack_deployments/` is 1,327 lines with **zero tests**, and it mints a 6-hour API token.
+
+## The missing engine, specified
+
+Resource pools are the one area where the absent implementation can be recovered rather than guessed.
+[`specs/0001-resource-pool-engine.md`](specs/0001-resource-pool-engine.md) (`zenml-feature-audit/SPEC-01`)
+extracts 46 cited requirements and a 31-test acceptance checklist from the disabled suite —
+**3–5 engineer-weeks**, with concurrency (not allocator logic) as the dominant risk, since all 31 tests
+are single-threaded against a schema explicitly built for contention.
+
+Two blockers are recorded there rather than glossed: the suite **cannot run at HEAD even un-skipped**
+(it references four model fields OSS lacks, three failing silently under `extra="ignore"`), and the
+bounded/unbounded resource-key partition that two tests turn on **is defined nowhere in `src/zenml`**.
+Method: [`analysis/0003-disabled-tests-as-specs.md`](analysis/0003-disabled-tests-as-specs.md).
+
+## OSS is cut down from a superset, not built up
+
+Three independent artefacts show OSS code referencing a **richer model surface than OSS itself
+defines**. Individually each looks like an oddity; together they are a pattern, and they explain why
+the scaffolding is so complete around the holes.
+
+| Vestige | Evidence | Referenced elsewhere? |
+|---|---|---|
+| `attach_resource_pools` / `detach_resource_pools` | Excluded from an update loop at `zen_stores/schemas/component_schemas.py:219-220` | **No** — these two lines are the only occurrences in the entire tree |
+| `update_trigger_snapshot_dispatch_state` | `sql_zen_store.py:8988` | **No callers**, and not on `ZenStoreInterface` — it exists for the Pro scheduler to call |
+| Four resource-pool model fields | The disabled suite constructs them; OSS lacks all four | Three fail **silently** under `extra="ignore"` (`models/v2/base/base.py:45`) |
+
+Add the contention machinery the resource-pool schema carries but nothing in OSS writes
+(`claim_token`, `claim_expires_at`, a unique `resource_pool_allocation.request_id`, a mutable
+`occupied` counter with a repair path), and the conclusion is that these features were **removed from
+a working implementation**, not left half-built.
+
+**Practical consequence:** grepping OSS for a symbol that "should" exist is not evidence it never did.
+When implementing against one of these holes, the surrounding dead references are the best available
+description of the missing contract.
+
 ## Things that surprised us
 
 - **Service accounts can never be admins.** `is_admin=False` is hardcoded
@@ -111,24 +159,20 @@ Some dossiers use "Tier B" loosely for *any* config-gated area (0008, 0009, 0011
 Pro-only case in the repo — entitlement-gated, RBAC-typed, fully scaffolded, engine absent. Drop it
 if it is out of scope for you.
 
-**Nine routers fall outside the twelve requested areas** and have no dossier. They were checked
-anyway so the gap is not silent — **all nine are "Open"**: each uses the standard RBAC wrappers, and
-**none carries an entitlement check**, so they ship and work in OSS, unenforced and unmetered.
+**Five routers still fall outside the thirteen areas** (the four stack routers now have dossier 0013).
+They were checked so the gap is not silent — **all five are "Open"**: each uses the standard RBAC
+wrappers, none carries an entitlement check.
 
 | Router | RBAC calls | Entitlement calls |
 |---|---|---|
-| `stacks_endpoints.py` | 16 | 0 |
 | `logs_endpoints.py` | 13 | 0 |
-| `stack_components_endpoints.py` | 13 | 0 |
-| `flavors_endpoints.py` | 12 | 0 |
 | `code_repositories_endpoints.py` | 10 | 0 |
 | `hook_invocations_endpoints.py` | 7 | 0 |
-| `stack_deployment_endpoints.py` | 6 | 0 |
 | `run_metadata_endpoints.py` | 4 | 0 |
 | `tags_endpoints.py` | 4 | 0 |
 
-The largest of these — Stacks & Stack Components — is a real feature area in its own right and
-would deserve a dossier if the audit is extended.
+Each is a sub-surface of an area already covered (pipelines, artifacts) rather than a feature in its
+own right.
 
 **Also not covered:** the dashboard (closed-source, not in this repo), ZenML Pro's own control
 plane, and runtime behaviour — every finding here is static. See `README.md` for the verification

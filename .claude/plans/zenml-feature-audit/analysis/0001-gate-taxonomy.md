@@ -231,5 +231,5 @@ Also note: `RBACSqlZenStore` is selected whenever `ENV_ZENML_SERVER` is set
 (`zen_stores/base_zen_store.py:156-162`) with **no edition test**, so the "Pro" store class runs on
 every OSS server; only its leaf permission checks no-op. And `FlavorRegistry.register_integration_flavors`
 (`stack/flavor_registry.py:145-152`) calls `.flavors()` for **every** integration with no
-`check_installation()` gate — unlike `activate_integrations` (`registry.py:118`) — so every server
+`check_installation()` gate — unlike `activate_integrations` (`registry.py:117`) — so every server
 writes all integration flavor rows regardless of installed extras.

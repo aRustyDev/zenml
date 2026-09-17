@@ -14,6 +14,10 @@ changed by this audit.
 2. **[`analysis/0001-gate-taxonomy.md`](analysis/0001-gate-taxonomy.md)** — how gating works in this
    codebase. The four tiers, the nine mechanisms, and the vocabulary traps. Read before any dossier.
 3. **`findings/`** — one dossier per feature area, each answering the same seven questions.
+4. **`specs/`** — **aspirational** documents: what *should* become true, in the future tense. Distinct
+   from `findings/`, which records current reality. Currently one:
+   [`specs/0001-resource-pool-engine.md`](specs/0001-resource-pool-engine.md), cite as
+   `zenml-feature-audit/SPEC-01`.
 
 ## Dossiers
 
@@ -31,9 +35,20 @@ changed by this audit.
 | 10 | Projects | [`findings/0010-projects.md`](findings/0010-projects.md) |
 | 11 | Artifact Management | [`findings/0011-artifact-management.md`](findings/0011-artifact-management.md) |
 | 12 | Model Management | [`findings/0012-model-management.md`](findings/0012-model-management.md) |
+| 13 | Stacks & Components | [`findings/0013-stacks-and-components.md`](findings/0013-stacks-and-components.md) |
 
-Resource Pools was not in the original brief. It is included because it is the clearest Tier-A
-example in the repo — entitlement-gated, RBAC-typed, fully scaffolded, and missing its engine.
+Resource Pools and Stacks were not in the original brief. **Resource Pools** is the clearest Tier-A
+example in the repo — entitlement-gated, RBAC-typed, fully scaffolded, missing its engine. **Stacks &
+Components** was added after a coverage check found nine routers unclaimed by any dossier; it is the
+only substantial feature area among them.
+
+## Cross-cutting analyses
+
+| Doc | Subject |
+|---|---|
+| [`analysis/0001-gate-taxonomy.md`](analysis/0001-gate-taxonomy.md) | The four tiers, nine mechanisms, and vocabulary traps |
+| [`analysis/0002-where-gates-hide.md`](analysis/0002-where-gates-hide.md) | Two enforcement layers — router, and `RBACSqlZenStore` |
+| [`analysis/0003-disabled-tests-as-specs.md`](analysis/0003-disabled-tests-as-specs.md) | Treating a disabled suite as a specification, and the sweep that found exactly one |
 
 ## The dossier template
 

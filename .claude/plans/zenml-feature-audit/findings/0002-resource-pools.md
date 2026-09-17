@@ -157,3 +157,32 @@ There is **no** `tests/unit/zen_stores/resource_pools/` directory. Coverage live
 `grep -rn "resource_pool" tests --include="*.py"` → 19 hits across those 2 files.
 
 **This is the single most informative artefact in the audit.** The skipped suite names the exact allocator semantics the missing implementation must provide — `test_request_rejected_if_exceeds_pool_total_capacity` (`:183`), `test_non_preemptible_request_rejected_if_exceeds_reserved_share` (`:261`), `test_preemption_skips_non_preemptible_victims` (`:731`), `test_orphaned_requests_are_cancelled_before_allocation` (`:896`), `test_decreasing_pool_capacity_keeps_allocated_and_rebuilds_queue` (`:1101`), `test_reconciliation_repairs_occupied_resource_counters` (`:1877`), and 25 more. It imports `SqlZenStore` (`:28`) and the concrete schemas (`:23-27`), i.e. it was written to run against an implementation bound to `store.resource_pools` — which OSS does not have. The suite is a specification for Tier A work, checked into OSS and disabled.
+
+## 8. Addendum — the gap is wider than the engine (added after SPEC-01 extraction)
+
+Extracting `../specs/0001-resource-pool-engine.md` from the skipped suite surfaced a finding that
+sharpens §2. **OSS is missing part of the resource-pool *model API*, not only the store engine.**
+The suite constructs models that the OSS package does not define:
+
+| Symbol the tests use | Reality at `cc064f100` | Failure mode |
+|---|---|---|
+| `ResourcePoolSubjectPolicyRequest(...)` without `pool_id` | `pool_id: UUID` is **required, no default** — `models/v2/core/resource_pool_subject_policy.py:50-52` | Loud `ValidationError` |
+| `ResourcePoolRequest.policies` | does not exist | **Silent** — field dropped |
+| `ResourcePoolUpdate.attach_policies` / `detach_policies` | do not exist | **Silent** — dropped |
+| `ResourceRequestResponse.running_in_pool` | does not exist | **Silent** — dropped |
+
+Three of the four are silent because `BaseModel` sets `extra="ignore"` (`models/v2/base/base.py:45`).
+
+**Consequences:**
+
+1. **The suite cannot run at HEAD even with the skip removed.** "Un-skip it and see" would yield tests
+   that construct successfully while quietly discarding their input — green or red for the wrong reason.
+2. **Closing this feature means implementing 15 abstract methods *and* extending four models.** §5's
+   self-host estimate should be read with that addition.
+3. It is further evidence the scaffolding was **cut down from a working implementation** rather than
+   built up toward one: the schemas and migration carry contention machinery (`claim_token`,
+   `claim_expires_at`, a unique `resource_pool_allocation.request_id`, a mutable `occupied` counter)
+   that nothing in OSS ever writes.
+
+See `../analysis/0003-disabled-tests-as-specs.md` § "The suite does not run at HEAD" for the
+generalised rule this produced.

@@ -44,7 +44,7 @@ The only dial is what is installed in the Python environment.
 `FlavorRegistry.register_integration_flavors` (`flavor_registry.py:145-152`) iterates
 `integration_registry.integrations.items()` and calls `integration.flavors()` on every one —
 there is no installation check in that loop, unlike `activate_integrations`
-(`registry.py:118`). So a ZenML server writes **all 68 integration flavor rows** to its DB
+(`registry.py:117`). So a ZenML server writes **all 68 integration flavor rows** to its DB
 regardless of which extras are installed. Flavor *listing* is therefore edition- and
 install-independent; only instantiation fails later.
 
@@ -52,7 +52,7 @@ install-independent; only instantiation fails later.
 
 | # | Mechanism | Location | Effect |
 |---|---|---|---|
-| **1** | **Dependency presence (dominant gate)** | `Integration.check_installation` (`integration.py:60-94`) via `requirement_installed` + `get_dependencies`; consumed at `registry.py:118` | Integration is not *activated* (materializers, connectors not eagerly registered) |
+| **1** | **Dependency presence (dominant gate)** | `Integration.check_installation` (`integration.py:60-94`) via `requirement_installed` + `get_dependencies`; consumed at `registry.py:117` | Integration is not *activated* (materializers, connectors not eagerly registered) |
 | 1 | Dependency presence — silent directory scan | `IntegrationRegistry._initialize` (`registry.py:75-97`) `importlib.import_module` per directory; `except ImportError: logger.exception(...)` then `continue` (`:95-96`) | A package that fails to import is **dropped from the registry**; it logs but never raises |
 | 1 | Dependency presence — broad activation catch | `registry.py:121-134` catches bare `Exception` (not just `ImportError`/`OSError`, despite the docstring at `:105-109`), logs and continues | Broken installs degrade to "feature missing from auto-discovery" |
 | 1 | Platform gate — python version | `great_expectations/__init__.py:34` — `"great-expectations>=0.17.15,<1.0; python_version < '3.14'"` (a PEP 508 marker inside `REQUIREMENTS`) | On Python ≥3.14 the requirement resolves empty → integration reports installed but GE is absent |
@@ -109,7 +109,7 @@ What a user actually loses, and the substitute:
 
 | Loss | Cause | Substitute |
 |---|---|---|
-| An integration's materializers/connectors not auto-registered | `check_installation` returned `False` (`registry.py:118`) | `zenml integration install <name>` (`cli/integration.py:259+`) or install the extra directly |
+| An integration's materializers/connectors not auto-registered | `check_installation` returned `False` (`registry.py:117`) | `zenml integration install <name>` (`cli/integration.py:259+`) or install the extra directly |
 | An integration silently missing from `zenml integration list` | `_initialize` swallowed an `ImportError` (`registry.py:95-96`) | Raise log level; the exception *is* logged via `logger.exception` |
 | MLX on Intel macOS / Windows | `mlx/__init__.py:48-49` hard-returns `False` | none — platform limit |
 | `tensorflow_io` filesystem plugins on Apple Silicon | `tensorflow/__init__.py:38` | none — upstream wheel gap |
