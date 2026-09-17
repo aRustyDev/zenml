@@ -213,6 +213,7 @@ uv.lock
 **/.claude/settings.local.json
 .claude/*
 !.claude/skills/
+!.claude/plans/
 
 # Codex
 .codex/*
