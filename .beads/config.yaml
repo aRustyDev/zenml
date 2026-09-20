@@ -1,0 +1,38 @@
+# Beads configuration for aRustyDev/zenml.
+#
+# bd is a PURE CLIENT of the shared Dolt server at bd.agents.woven:3306. It does not
+# run a local database and must not try to start one -- hence dolt.auto-start: false.
+#
+# NEVER run `bd dolt push`. It is denied by design: the per-database grants omit
+# CALL DOLT_PUSH, and this repo's git origin is not a valid Dolt remote target, so
+# bd's auto-registration would register a broken one. Issue writes need no manual
+# commit; bd makes one Dolt commit per write.
+#
+# Durability is the SERVER-SIDE daily backup CronJob (02:43 UTC) declared in
+# ApiraTech/infrastructure at shared/kube/beads/backup.tf. That is why client-side
+# auto-backup is off below -- deliberately, not by omission. bd's auto-backup writes
+# to the *database's* filesystem, which on a shared server belongs to the host, so it
+# could never succeed from here and would warn on every command, reads included.
+#
+# The `zenml` database MUST stay in local.beads_databases in
+# shared/kube/beads/principals.tf. That one list drives grants, backup, the restore
+# drill, Dolt GC and the config-commit floor -- a database absent from it has NO
+# backup at all, and the restore drill passes without ever touching it.
+#
+# Identity is NOT configured here: each person supplies BEADS_DOLT_SERVER_USER and
+# BEADS_DOLT_PASSWORD from their environment. Without the former bd silently defaults
+# to root and every command fails naming root, not them.
+#
+# Database name resolution order: env, then .beads/metadata.json, then this file.
+
+issue-prefix: "zenml"
+sync.remote: "git@github.com:aRustyDev/zenml.git"
+
+backup:
+  enabled: false
+
+dolt.host: "bd.agents.woven"
+dolt.port: 3306
+dolt.shared-server: true
+dolt.auto-start: false
+dolt.database: "zenml"
